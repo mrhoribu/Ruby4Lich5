@@ -1,0 +1,33 @@
+# TEMPORARY (fork only): does install.sh finish at all on an Intel Mac now that
+# Homebrew builds everything from source there? Not for upstream.
+name: Intel Mac experiment
+on:
+  pull_request:
+    paths: ['.github/workflows/intel-mac-experiment.yml']
+permissions:
+  contents: read
+jobs:
+  intel:
+    name: install.sh on ${{ matrix.runner }} (6 h limit)
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 355
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-26-intel]
+    env:
+      SHELL: /bin/zsh
+      HOMEBREW_NO_AUTO_UPDATE: ''
+    steps:
+      - name: Run install.sh from the feature branch (7484a6c1a1ff7ed43b56386ee98ed7a4e22c8841)
+        run: |
+          start=$(date +%s)
+          curl -fsSL https://raw.githubusercontent.com/mrhoribu/Ruby4Lich5/7484a6c1a1ff7ed43b56386ee98ed7a4e22c8841/site/install.sh | bash -s -- --yes 2>&1 | tee install.log
+          echo "elapsed: $(( ($(date +%s) - start) / 60 )) minutes"
+      - if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: intel-install-log
+          path: install.log
+          if-no-files-found: ignore
+          retention-days: 7
