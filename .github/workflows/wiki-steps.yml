@@ -1,0 +1,96 @@
+# TEMPORARY (fork only): runs the gswiki Lich install guides' manual steps
+# verbatim, to find what the guides need fixed. Not for upstream.
+name: Wiki install steps
+
+on:
+  pull_request:
+    paths:
+      - '.github/wiki-steps/**'
+      - '.github/workflows/wiki-steps.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    name: Linux guide on ${{ matrix.image }}
+    runs-on: ubuntu-24.04
+    container: ${{ matrix.image }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { image: 'ubuntu:22.04',      family: debian }
+          - { image: 'ubuntu:24.04',      family: debian }
+          - { image: 'ubuntu:26.04',      family: debian }
+          - { image: 'debian:12',         family: debian }
+          - { image: 'debian:13',         family: debian }
+          - { image: 'fedora:43',         family: fedora }
+          - { image: 'archlinux:latest',  family: arch }
+    steps:
+      # A bare container lacks what any desktop already has: sudo, bash, tar.
+      - name: Give the container a desktop's basics
+        shell: sh
+        run: |
+          if command -v apt-get >/dev/null; then
+            apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y sudo ca-certificates
+          elif command -v dnf >/dev/null; then
+            dnf install -y sudo tar gzip findutils which
+          elif command -v pacman >/dev/null; then
+            pacman -Syu --noconfirm --needed sudo
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Follow the Linux guide
+        shell: bash
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          touch ~/.bashrc
+          bash -i .github/wiki-steps/linux.sh ${{ matrix.family }} 2>&1 | tee steps.log
+      - name: Keep log
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: wiki-linux-${{ strategy.job-index }}
+          path: steps.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+  macos:
+    name: macOS guide on ${{ matrix.runner }}${{ matrix.fresh && ' (fresh Homebrew state)' || '' }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: macos-26-intel, fresh: false }
+          - { runner: macos-26-intel, fresh: true }
+          - { runner: macos-26,       fresh: true }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # GitHub's image has libyaml preinstalled and Homebrew auto-update off.
+      # A user's Mac has neither, so undo both for the "fresh" legs.
+      - name: Make Homebrew look like a fresh Mac's
+        if: ${{ matrix.fresh }}
+        run: |
+          brew uninstall --ignore-dependencies libyaml || true
+          brew list libyaml >/dev/null 2>&1 && exit 1 || echo "libyaml removed"
+          echo "HOMEBREW_NO_AUTO_UPDATE=" >> "$GITHUB_ENV"
+      - name: Follow the macOS guide
+        run: |
+          zsh -l .github/wiki-steps/macos.zsh 2>&1 | tee steps.log
+      - name: Keep log
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: wiki-macos-${{ strategy.job-index }}
+          path: steps.log
+          if-no-files-found: ignore
+          retention-days: 7
