@@ -215,12 +215,17 @@ jobs:
           ruby -v
           ruby lich.rbw --version | Select-Object -First 1
           if ($LASTEXITCODE -ne 0) { throw 'lich --version failed' }
-          ruby -I lib -e 'require "gemcheck"; m = Lich::GemCheck.missing_gems([:default, :profanity, :gtk]); abort("missing: #{m.join(", ")}") unless m.empty?; puts "Lich GemCheck: all gems present"'
+          # Windows PowerShell 5.1 drops embedded double quotes from native
+          # arguments, so the Ruby checks go in files instead of -e strings.
+          Set-Content -Encoding ascii gemcheck.rb 'require "gemcheck"; m = Lich::GemCheck.missing_gems([:default, :profanity, :gtk]); abort("missing: #{m.join(", ")}") unless m.empty?; puts "Lich GemCheck: all gems present"'
+          ruby -I lib gemcheck.rb
           if ($LASTEXITCODE -ne 0) { throw 'GemCheck failed' }
-          ruby -e "require 'gtk3'; puts 'gtk3 loads'"
+          Set-Content -Encoding ascii gtkload.rb 'require "gtk3"; puts "gtk3 loads"'
+          ruby gtkload.rb
           if ($LASTEXITCODE -ne 0) { throw 'gtk3 failed to load' }
           # Lich's real Windows startup check against the live manifest; a repair prompt would hang, so time-box it.
-          $p = Start-Process ruby -ArgumentList '-I','lib','-e','require "gemcheck"; Lich::GemCheck.verify!(:default, :gtk); puts "startup gem check passed with no repair"' -NoNewWindow -PassThru -RedirectStandardOutput verify.out -RedirectStandardError verify.err
+          Set-Content -Encoding ascii startup.rb 'require "gemcheck"; Lich::GemCheck.verify!(:default, :gtk); puts "startup gem check passed with no repair"'
+          $p = Start-Process ruby -ArgumentList '-I','lib','startup.rb' -NoNewWindow -PassThru -RedirectStandardOutput verify.out -RedirectStandardError verify.err
           if (-not $p.WaitForExit(180000)) { $p.Kill(); throw 'startup gem check did not finish (repair prompt?)' }
           Get-Content verify.out, verify.err
           if ($p.ExitCode -ne 0) { throw "startup gem check exited $($p.ExitCode)" }
