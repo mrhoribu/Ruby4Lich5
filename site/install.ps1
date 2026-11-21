@@ -12,7 +12,7 @@
 # 3. The latest Lich release is downloaded and checked against its SHA-256.
 param(
   [string]$Dir = (Join-Path $HOME 'Lich5'),
-  [switch]$NoModifyPath
+  [switch]$NoPath
 )
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
@@ -74,8 +74,13 @@ try {
   $rv = (Get-Command rv.exe -ErrorAction SilentlyContinue).Source
   if (-not $rv) { $rv = Join-Path $HOME '.local\bin\rv.exe' }
   if (-not (Test-Path $rv)) {
+    # Run rv's installer in its own process: under irm | iex it would share
+    # this script's scope (its variables would collide with ours).
+    $rvInstaller = Join-Path $tmp 'rv-install.ps1'
+    Invoke-WebRequest -Uri 'https://rv.dev/install.ps1' -OutFile $rvInstaller -UseBasicParsing
     $env:RV_NO_MODIFY_PATH = '1'
-    Invoke-RestMethod https://rv.dev/install.ps1 | Invoke-Expression
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $rvInstaller
+    if ($LASTEXITCODE -ne 0) { Fail "rv's installer failed." }
     if (-not (Test-Path $rv)) { Fail "rv's installer finished but $rv is missing." }
   }
   Ok (& $rv --version)
@@ -144,7 +149,7 @@ try {
     Ok "Lich $($lich.Tag) is in $Dir"
   }
 
-  if (-not $NoModifyPath) {
+  if (-not $NoPath) {
     Step "Putting Lich's Ruby on your PATH"
     $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
     $parts = @($userPath -split ';' | Where-Object { $_ -and ($_ -notlike "$rubies\ruby-*\bin") })
