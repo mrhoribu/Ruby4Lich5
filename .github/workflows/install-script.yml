@@ -226,6 +226,7 @@ jobs:
           # Lich's real Windows startup check against the live manifest; a repair prompt would hang, so time-box it.
           Set-Content -Encoding ascii startup.rb 'require "gemcheck"; Lich::GemCheck.verify!(:default, :gtk); puts "startup gem check passed with no repair"'
           $p = Start-Process ruby -ArgumentList '-I','lib','startup.rb' -NoNewWindow -PassThru -RedirectStandardOutput verify.out -RedirectStandardError verify.err
+          $null = $p.Handle   # without this, ExitCode reads empty after WaitForExit(timeout)
           if (-not $p.WaitForExit(180000)) { $p.Kill(); throw 'startup gem check did not finish (repair prompt?)' }
           Get-Content verify.out, verify.err
           if ($p.ExitCode -ne 0) { throw "startup gem check exited $($p.ExitCode)" }
