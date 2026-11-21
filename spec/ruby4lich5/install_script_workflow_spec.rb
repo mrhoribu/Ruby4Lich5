@@ -60,7 +60,7 @@ RSpec.describe 'Install script workflow' do
 
   it 'tests on Linux (x64 and ARM) and Apple Silicon macOS' do
     runners = jobs.dig('test', 'strategy', 'matrix', 'include').map { |leg| leg.fetch('runner') }
-    expect(runners).to include('ubuntu-26.04', 'ubuntu-26.04-arm', 'ubuntu-24.04', 'ubuntu-22.04', 'macos-26', 'macos-15')
+    expect(runners).to include('ubuntu-26.04', 'ubuntu-26.04-arm', 'ubuntu-24.04', 'macos-26', 'macos-15')
     # Homebrew no longer supports Intel macOS, so GTK can't be built there in
     # reasonable time; an Intel leg may only test the GTK-free (--no-gtk) setup.
     intel = jobs.dig('test', 'strategy', 'matrix', 'include').select { |leg| leg.fetch('runner').include?('intel') }

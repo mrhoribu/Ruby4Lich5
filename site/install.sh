@@ -223,7 +223,7 @@ detect_platform() {
     *) die "Unsupported operating system: $(uname -s)" ;;
   esac
 
-  # rv's prebuilt Ruby needs macOS 14+ or glibc 2.35+.
+  # rv's prebuilt Ruby needs macOS 14+ or glibc 2.39+.
   if [ "$OS" = "macos" ]; then
     local mac_major
     mac_major=$(sw_vers -productVersion 2>/dev/null | cut -d. -f1)
@@ -232,8 +232,10 @@ detect_platform() {
   else
     local glibc
     glibc=$(ldd --version 2>/dev/null | head -n 1 | grep -oE '[0-9]+\.[0-9]+$' || true)
-    if [ -n "$glibc" ] && ! version_ge "$glibc" "2.35"; then
-      die "Prebuilt Ruby needs glibc 2.35 or newer (Ubuntu 22.04, Debian 12, Fedora 36 or later); this system has $glibc. Follow $WIKI/Linux instead."
+    # rv-ruby's glibc builds link GLIBC_2.38/2.39 symbols (built on Ubuntu 24.04),
+    # though rv's own binary only needs 2.35.
+    if [ -n "$glibc" ] && ! version_ge "$glibc" "2.39"; then
+      die "Prebuilt Ruby needs glibc 2.39 or newer (Ubuntu 24.04, Debian 13, Fedora 40 or later); this system has $glibc (Debian 12 and Chromebooks, Ubuntu 22.04). Follow $WIKI/Linux instead."
     fi
   fi
 
@@ -624,7 +626,10 @@ install_gems() {
   [ "$WITH_GTK" -eq 1 ] && info "Building the GTK gems takes several minutes."
   if [ "$DRY_RUN" -eq 0 ]; then cd "$LICH_DIR" || die "Can't open $LICH_DIR."; fi
   run "$RUBY_BIN/bundle" config set --local without "$without" || die "bundle config failed."
-  run "$RUBY_BIN/bundle" install || die "bundle install failed. The error above names the gem that failed."
+  # --prefer-local: the Gemfile lists gems Ruby already ships (openssl, json,
+  # fiddle, ...) without versions and there's no lockfile, so plain bundle
+  # install would fetch and compile newer copies, needing OpenSSL headers.
+  run "$RUBY_BIN/bundle" install --prefer-local || die "bundle install failed. The error above names the gem that failed."
   ok "Gems are installed"
 }
 
