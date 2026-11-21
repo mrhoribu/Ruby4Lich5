@@ -67,6 +67,8 @@ jobs:
           - { name: 'Arch Linux',                  runner: ubuntu-26.04,     shell: /bin/bash, container: 'archlinux:latest' }
           - { name: 'macOS 26 (Apple Silicon)',    runner: macos-26,         shell: /bin/zsh }
           - { name: 'macOS 15 (Apple Silicon)',    runner: macos-15,         shell: /bin/zsh }
+          - { name: 'macOS 26 (Intel, --no-gtk)',  runner: macos-26-intel,   shell: /bin/zsh, args: '--no-gtk' }
+          - { name: 'macOS 26 (--no-gtk)',         runner: macos-26,         shell: /bin/zsh, args: '--no-gtk' }
     env:
       # The user's login shell decides which startup file the script edits.
       SHELL: ${{ matrix.shell }}
